@@ -1,71 +1,102 @@
-import argparse
-import numpy as np
+import warnings
+from statsmodels.tools.sm_exceptions import ConvergenceWarning
+
+# Suppress only the ConvergenceWarning from statsmodels
+warnings.simplefilter("ignore", ConvergenceWarning)
+
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
-import google.generativeai as genai
 
-# 🔑 Configure Gemini
-genai.configure(api_key="AIzaSyC2EVCSgC-DRWVunkKi7Ro0J1upoN3UglE")
-model = genai.GenerativeModel("gemini-1.5-flash")
+# --- Step 1: User input for data generation parameters ---
+try:
+    promo_prob = float(input("Set daily promo probability (default 0.12): ") or 0.12)
+except ValueError:
+    promo_prob = 0.12
 
+try:
+    trend_start = float(input("Set start of sales trend (default 200): ") or 200)
+except ValueError:
+    trend_start = 200
 
-def forecast(sales_history):
-    try:
-        if len(sales_history) < 5:
-            print("❌ Error: Need at least 5 data points for forecasting.")
-            return
+try:
+    trend_end = float(input("Set end of sales trend (default 280): ") or 280)
+except ValueError:
+    trend_end = 280
 
-        # Holt-Winters forecasting
-        series = pd.Series(sales_history)
-        model_hw = ExponentialSmoothing(series, trend="add", seasonal=None)
-        model_fit = model_hw.fit()
-        forecast_values = model_fit.forecast(steps=3).tolist()
+try:
+    holiday_month = int(input("Set main holiday month (1-12, default 12): ") or 12)
+    if holiday_month < 1 or holiday_month > 12:
+        holiday_month = 12
+except ValueError:
+    holiday_month = 12
 
-        # Trend detection
-        trend_direction = (
-            "increasing 📈" if np.mean(sales_history[-3:]) > np.mean(sales_history[:3]) else "decreasing 📉"
-        )
+# --- Step 2: Generate synthetic retail sales dataset with inputs ---
+np.random.seed(42)
+dates = pd.date_range(start="2023-01-01", periods=730, freq='D')
+trend = np.linspace(trend_start, trend_end, 730)
+seasonality = 30 * np.sin(2 * np.pi * dates.dayofyear / 365.25)
+random_noise = np.random.normal(0, 15, 730)
+promo = np.random.binomial(1, promo_prob, 730)
+holiday_spike = np.where((dates.month == holiday_month) & (dates.day < 26), 50, 0)
 
-        # AI prompt
-        prompt = f"""
-        You are an AI retail analyst.
-        Given the sales history: {sales_history}
-        Forecasted next 3 sales: {forecast_values}
-        Trend: {trend_direction}
+sales = trend + seasonality + random_noise + (promo * 40) + holiday_spike
+sales = np.maximum(0, sales)
 
-        Provide:
-        1. A professional inventory recommendation.
-        2. A short explanation why this recommendation is suitable.
-        """
+data = pd.DataFrame({
+    'date': dates,
+    'sales': sales.round().astype(int),
+    'promo': promo,
+})
 
-        response = model.generate_content(prompt)
-        ai_text = response.text if response else "❌ No AI response"
+# Save dataset as CSV
+data.to_csv("retail_sales_data.csv", index=False)
+print("Synthetic retail sales dataset saved as 'retail_sales_data.csv'.")
 
-        # Split AI recommendation + explanation
-        parts = ai_text.split("\n", 1)
-        recommendation = parts[0].strip() if parts else "Not generated"
-        ai_explanation = parts[1].strip() if len(parts) > 1 else ai_text
+# --- Step 3: Forecast sales for next 30 days ---
+data.set_index('date', inplace=True)
+data.index = pd.DatetimeIndex(data.index, freq='D')  # Set frequency explicitly
+ts = data['sales']
 
-        # Print results
-        print("\n📊 Forecast & AI Recommendation")
-        print(f"Next 3 Sales Predictions: {', '.join([str(round(x, 2)) for x in forecast_values])}")
-        print(f"Trend: {trend_direction}")
-        print(f"Inventory Recommendation: {recommendation}")
-        print("\nAI Explanation:")
-        print(ai_explanation)
+decomp = seasonal_decompose(ts, model='additive', period=365)
+decomp.plot()
+plt.suptitle('Seasonal Decomposition (Additive)', y=1.01)
+plt.tight_layout()
+plt.show()
 
-    except Exception as e:
-        print(f"❌ Error: {e}")
+forecast_period = 30
+model = ExponentialSmoothing(ts, trend='additive', seasonal='additive', seasonal_periods=365)
+fit = model.fit()
+forecast = fit.forecast(forecast_period)
 
+# --- Step 4: Inventory Recommendations ---
+mean_sales = ts[-30:].mean()
+std_sales = ts[-30:].std()
+lead_time = 7
+safety_stock = int(1.65 * std_sales * np.sqrt(lead_time))
+reorder_point = int(mean_sales * lead_time + safety_stock)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Retail Sales Intelligence AI (Terminal Version)")
-    parser.add_argument("--sales", type=str, help="Comma-separated sales history (at least 5 values)")
+print(f"\n--- Inventory Recommendation ---")
+print(f"Recommended reorder point for next period: {reorder_point} units")
+print(f"Suggested safety stock: {safety_stock} units")
 
-    args = parser.parse_args()
+# --- Step 5: Visualization ---
+plt.figure(figsize=(14, 6))
+plt.plot(ts.index, ts.values, label="Actual Sales")
+plt.plot(pd.date_range(ts.index[-1]+pd.Timedelta(days=1), periods=forecast_period, freq='D'),
+         forecast, 'r--', label="30-Day Forecast")
+plt.title("Retail Sales: History & 30-Day Forecast")
+plt.xlabel("Date")
+plt.ylabel("Sales")
+plt.legend()
+plt.tight_layout()
+plt.show()
 
-    # If not provided, ask interactively
-    sales_input = args.sales if args.sales else input("Enter Sales History (comma-separated, at least 5 values): ")
-    sales_history = [float(x.strip()) for x in sales_input.split(",") if x.strip()]
-
-    forecast(sales_history)
+data_reset = data.reset_index()
+corr = data_reset[['sales', 'promo']].corr()
+sns.heatmap(corr, annot=True, cmap='YlGnBu')
+plt.title('Feature Correlation Heatmap')
+plt.show()

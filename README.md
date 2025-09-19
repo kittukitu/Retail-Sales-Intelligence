@@ -1,115 +1,90 @@
-🛍️ Retail Sales Intelligence AI
+Retail Sales Forecasting & Inventory Recommendation
+This project generates synthetic daily retail sales data with customizable parameters for promotions, sales trends, and holiday effects. It trains a time series forecasting model to predict next month’s sales, provides inventory (reorder point, safety stock) recommendations, and visualizes historical data with forecasts and correlations.
 
-An AI-powered tool that combines time series forecasting (Holt-Winters) with Google Gemini AI to predict retail sales trends and provide inventory recommendations.
+Features
+Synthetic retail sales dataset: 2 years (730 days) with daily granularity.
 
-🚀 Features
+Customizable simulation parameters:
 
-Uses Holt-Winters Exponential Smoothing for forecasting.
+Promotion probability
 
-Predicts the next 3 sales values.
+Start and end of sales trend
 
-Detects trend direction (increasing 📈 or decreasing 📉).
+Main holiday month
 
-Generates AI-powered inventory recommendations with explanations.
+Promotional and holiday impact on sales
 
-Supports both command-line arguments and interactive mode.
+Forecasting: 30-day sales prediction using Holt-Winters Exponential Smoothing.
 
-⚙️ Installation
-1. Clone Repository
-git clone https://github.com/yourusername/retail-sales-ai.git
-cd retail-sales-ai
+Inventory recommendations: Safety stock and reorder point calculation.
 
-2. Create Virtual Environment (recommended)
-python -m venv venv
-source venv/bin/activate   # On Mac/Linux
-venv\Scripts\activate      # On Windows
+Visualizations:
 
-3. Install Dependencies
-pip install -r requirements.txt
+Seasonal decomposition
 
+Historical vs forecasted sales
 
-requirements.txt
+Feature correlation heatmap.
+
+Requirements
+Python 3.x
+
+pandas
 
 numpy
-pandas
+
+matplotlib
+
+seaborn
+
 statsmodels
-google-generativeai
-argparse
 
-🔑 Setup Gemini API
+Install with:
 
-Get your API Key from Google AI Studio
-.
+bash
+pip install pandas numpy matplotlib seaborn statsmodels
+Usage
+Run the script
+The script will prompt for data generation parameters with defaults:
 
-Replace your key in the script:
+Daily promo probability (default=0.12)
 
-genai.configure(api_key="YOUR_API_KEY")
+Sales trend start value (default=200)
 
-🖥️ Usage
-Run with CLI arguments
-python app.py --sales 120,135,150,160,170,180,200
+Sales trend end value (default=280)
 
-Run in interactive mode
-python app.py
+Main holiday month (default=12)
+Enter custom values or press Enter to accept defaults.
 
+Data Generation
+A synthetic sales dataset is generated and saved as retail_sales_data.csv.
 
-Example Input/Output:
+Forecast & Inventory Recommendation
 
-Enter Sales History (comma-separated, at least 5 values): 120,135,150,160,170,180,200
+30-day forecast using Holt-Winters model.
 
-📊 Forecast & AI Recommendation
-Next 3 Sales Predictions: 190.67, 201.23, 211.56
-Trend: increasing 📈
-Inventory Recommendation: Increase stock levels gradually to match rising demand.
+Inventory calculations for reorder point and safety stock for the next lead time period.
 
-AI Explanation:
-The forecast indicates a steady upward trend in sales, so increasing inventory ensures you meet demand without overstocking.
+Recommendations are printed in the console.
 
-✅ Test Cases
-Test Case 1: Increasing Trend
-python app.py --sales 100,120,140,160,180,200,220
+Visualizations
 
+Seasonal decomposition plot
 
-Expected:
+Historical sales and forecast plot
 
-Predictions continue increasing.
+Correlation heatmap (sales vs promo)
 
-Trend: increasing 📈
+Files
+retail_sales_data.csv: The generated daily sales dataset
 
-AI suggests increasing inventory gradually.
+Script file: Main Python script with forecasting and recommendations
 
-Test Case 2: Decreasing Trend
-python app.py --sales 500,480,460,440,420,400,380
+Notes
+Dataset simulates holiday sales spike before 26th of chosen holiday month.
 
+Seasonal period is set to one year, accommodating annual patterns.
 
-Expected:
+Lead time is set to 7 days (changeable in script for different scenarios).
 
-Predictions keep decreasing.
-
-Trend: decreasing 📉
-
-AI suggests reducing inventory or running promotions.
-
-Test Case 3: Insufficient Data
-python app.py --sales 100,200,300
-
-
-Expected:
-
-❌ Error: Need at least 5 data points for forecasting.
-
-📊 Methodology
-
-Forecasting Model → Holt-Winters Exponential Smoothing (trend="add").
-
-Trend Detection → Compares average of last 3 vs first 3 sales values.
-
-AI Recommendation → Prompt to Gemini AI with sales history, forecast, and trend.
-
-📌 Roadmap
-
- Add visualizations (matplotlib plots of forecasts).
-
- Support seasonality in Holt-Winters.
-
- Extend with real POS data integration.
+Visualizations require a GUI environment for display.
